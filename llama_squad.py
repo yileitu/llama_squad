@@ -1,5 +1,5 @@
-import torch
 from transformers import DataCollatorForLanguageModeling
+import torch
 
 
 class SquadDataCollator(DataCollatorForLanguageModeling):

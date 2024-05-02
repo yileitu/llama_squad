@@ -15,7 +15,7 @@ class ScriptArguments:
         default="single_turn",
         metadata={"help": "single_turn, multi_turn"},
     )
-    dataset: Optional[str] = field(
+    save_dir: Optional[str] = field(
         default="data/squad_v2",
     )
 
@@ -139,4 +139,4 @@ test_dataset = squad_dataset["validation"].map(
 )
 print(test_dataset[0])
 dataset = DatasetDict({"train": train_dataset, "test": test_dataset})
-dataset.save_to_disk(script_args.dataset)
+dataset.save_to_disk(script_args.save_dir)

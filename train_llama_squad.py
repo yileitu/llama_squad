@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import json
 import os
 from dataclasses import dataclass, field
 from typing import Optional
@@ -123,18 +122,11 @@ class ScriptArguments:
             "help": "Learning rate schedule. Constant a bit better than cosine, and has advantage for analysis"
         },
     )
-    lr_scheduler_kwargs: str = field(
-        default="{}",
-        metadata={
-            "help": "Learning rate scheduler kwargs. For example: '{\"num_cycles\": 3}'"
-        },
-    )
     max_steps: int = field(
         default=10000, metadata={"help": "How many optimizer update steps to take"}
     )
     warmup_ratio: float = field(
-        default=0,
-        metadata={"help": "Fraction of steps to do a warmup for"},
+        default=0.03, metadata={"help": "Fraction of steps to do a warmup for"}
     )
     group_by_length: bool = field(
         default=True,
@@ -159,6 +151,7 @@ class ScriptArguments:
         },
     )
     resume_from_checkpoint: Optional[str] = field(default=None)
+    save_strategy: Optional[str] = field(default="epoch")
 
 
 parser = HfArgumentParser(ScriptArguments)
@@ -200,9 +193,8 @@ def create_and_prepare_model(args):
     model.config.pretraining_tp = 1
 
     import re
-
     model_modules = str(model.modules)
-    pattern = r"\((\w+)\): Linear"
+    pattern = r'\((\w+)\): Linear'
     linear_layer_names = re.findall(pattern, model_modules)
 
     # target all linear layers
@@ -233,17 +225,17 @@ training_arguments = TrainingArguments(
     per_device_train_batch_size=script_args.per_device_train_batch_size,
     gradient_accumulation_steps=script_args.gradient_accumulation_steps,
     optim=script_args.optim,
-    save_steps=script_args.save_steps,
+    save_strategy=script_args.save_strategy,
+    # save_steps=script_args.save_steps,
     logging_steps=script_args.logging_steps,
     learning_rate=script_args.learning_rate,
     fp16=script_args.fp16,
     bf16=script_args.bf16,
     max_grad_norm=script_args.max_grad_norm,
-    max_steps=script_args.max_steps,
+    # max_steps=script_args.max_steps,
     warmup_ratio=script_args.warmup_ratio,
     group_by_length=script_args.group_by_length,
     lr_scheduler_type=script_args.lr_scheduler_type,
-    lr_scheduler_kwargs=json.loads(script_args.lr_scheduler_kwargs),
 )
 
 model, peft_config, tokenizer = create_and_prepare_model(script_args)
@@ -257,9 +249,7 @@ answer_start_tokens = torch.tensor(
     tokenizer.vocab.get("▁```", tokenizer.encode("\n\n```", add_special_tokens=False))
 ).view(-1)
 
-data_collator = SquadDataCollator(
-    answer_start_tokens=answer_start_tokens, tokenizer=tokenizer, mlm=False
-)
+data_collator = SquadDataCollator(answer_start_tokens=answer_start_tokens, tokenizer=tokenizer, mlm=False)
 
 trainer = SFTTrainer(
     model=model,
@@ -270,17 +260,14 @@ trainer = SFTTrainer(
     args=training_arguments,
     packing=script_args.packing,
     data_collator=data_collator,
-    formatting_func=lambda items: tokenizer.apply_chat_template(
-        items["messages"], tokenize=False
-    ),
+    formatting_func=lambda items: tokenizer.apply_chat_template(items["messages"], tokenize=False),
 )
 
 trainer.train(resume_from_checkpoint=script_args.resume_from_checkpoint)
+output_dir = os.path.join(script_args.output_dir, "final_checkpoints")
+trainer.model.save_pretrained(output_dir)
 
 if script_args.merge_and_push:
-    output_dir = os.path.join(script_args.output_dir, "final_checkpoints")
-    trainer.model.save_pretrained(output_dir)
-
     # Free memory for merging weights
     del model
     torch.cuda.empty_cache()
@@ -294,3 +281,4 @@ if script_args.merge_and_push:
 
     output_merged_dir = os.path.join(script_args.output_dir, "final_merged_checkpoint")
     model.save_pretrained(output_merged_dir, safe_serialization=True)
+    tokenizer.save_pretrained(output_merged_dir)
