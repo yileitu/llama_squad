@@ -1,6 +1,7 @@
 import csv
 import json
 import logging
+import os
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -83,6 +84,9 @@ def get_answer(messages, pipeline):
 
     return extract_answer(response), response
 
+output_dir = os.path.dirname(script_args.output_csv_file)
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
 
 with open(script_args.output_csv_file, "w") as file:
     writer = csv.writer(file)

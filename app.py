@@ -10,7 +10,7 @@ import torch
 from datasets import load_dataset
 from transformers import HfArgumentParser
 
-from create_squad_dataset import get_single_turn_prompt_and_response
+from create_mlqa_dataset import get_single_turn_prompt_and_response
 from model import (
     DEFAULT_SYSTEM_PROMPT,
     get_model_and_tokenizer,
