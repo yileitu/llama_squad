@@ -1,10 +1,8 @@
 import csv
-from dataclasses import dataclass, field
-from typing import Optional
 
-from transformers import HfArgumentParser
-
-csv_file_path = "results/mlqa/toy/primal_new.csv"
+LANG = "zh"
+MODEL_NAME = "tinyllama-1431k-3T"
+csv_file_path = f"results/mlqa/{LANG}/{MODEL_NAME}/deactivated.csv"
 
 with open(csv_file_path, "r") as file:
 	reader = csv.DictReader(file)

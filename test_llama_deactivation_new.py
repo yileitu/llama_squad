@@ -39,6 +39,7 @@ class ScriptArguments:
 	seed: Optional[int] = field(default=42)
 	num_samples: Optional[int] = field(default=None)
 	num_beams: Optional[int] = field(default=1)
+	lang: Optional[str] = field(default="en")
 	load_lang_neuron_position: Optional[bool] = field(default=False)
 	num_datapoints: Optional[str] = field(
 		default=5000,
@@ -74,7 +75,7 @@ sampling_params = SamplingParams(temperature=0, repetition_penalty=1.1, max_toke
 if script_args.load_lang_neuron_position:
 	position_path = os.path.join(
 		"/cluster/project/sachan/yilei/projects/LLM_subnet/language_neurons",
-		f"lang_neuron_position/{script_args.corpus_name}/{script_args.num_datapoints}/{script_args.model_full_name}.pt"
+		f"lang_neuron_position/{script_args.corpus_name}/{script_args.num_datapoints}/squad_finetuned/{script_args.model_full_name}.pt"
 		)
 	lang_neuron_positions = torch.load(position_path)
 else:
@@ -115,9 +116,10 @@ output_dir = os.path.dirname(script_args.output_csv_file)
 if not os.path.exists(output_dir):
 	os.makedirs(output_dir)
 
-LANGUAGES = ["en", "zh-Hans", "fr", "es", "vi", "id", "ja"]
+# LANGUAGES = ["en", "zh-Hans", "fr", "es", "vi", "id", "ja"]
+LANGUAGES = ["ar", "de", "en", "es", "hi", "vi", "zh"]
 for activation_mask, mask_lang in tqdm(zip(lang_neuron_positions, LANGUAGES)):
-	if mask_lang == 'en':
+	if mask_lang == script_args.lang:
 		if activation_mask:
 			for i, layer_mask in enumerate(activation_mask):
 				obj = model.llm_engine.driver_worker.model_runner.model.model.layers[i].mlp

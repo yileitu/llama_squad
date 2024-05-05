@@ -188,6 +188,7 @@ def create_and_prepare_model(args):
         use_auth_token=True,
         trust_remote_code=True,
     )
+    print(model.config)
 
     # check: https://github.com/huggingface/transformers/pull/24906
     model.config.pretraining_tp = 1
@@ -266,6 +267,7 @@ trainer = SFTTrainer(
 trainer.train(resume_from_checkpoint=script_args.resume_from_checkpoint)
 output_dir = os.path.join(script_args.output_dir, "final_checkpoints")
 trainer.model.save_pretrained(output_dir)
+tokenizer.save_pretrained(output_dir)
 
 if script_args.merge_and_push:
     # Free memory for merging weights
@@ -275,7 +277,7 @@ if script_args.merge_and_push:
     from peft import AutoPeftModelForCausalLM
 
     model = AutoPeftModelForCausalLM.from_pretrained(
-        output_dir, device_map="auto", torch_dtype=torch.bfloat16
+        output_dir, device_map="auto", torch_dtype=torch.float16
     )
     model = model.merge_and_unload()
 

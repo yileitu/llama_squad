@@ -5,9 +5,9 @@ from datasets import DatasetDict, load_dataset
 
 from model import DEFAULT_SYSTEM_PROMPT
 
-dataset_path = "MLQA_V1/dev/dev-context-en-question-en.json"
-save_dir = "data/mlqa/toy"
 
+LANG = "es"
+save_dir = f"data/mlqa/{LANG}/dev"
 SYSTEM_PROMPT = DEFAULT_SYSTEM_PROMPT
 
 
@@ -66,11 +66,10 @@ def get_single_turn_prompt_and_response(item, all_answers=False):
 		}
 
 
-mlqa_dataset = load_dataset("mlqa", "mlqa.en.en", split="validation")
-# mlqa_dataset = mlqa_dataset['train']['data'] # ['train'] is the default split when loading local dataset
-instruction = get_single_turn_prompt_and_response
+mlqa_dataset = load_dataset("mlqa", f"mlqa.{LANG}.{LANG}", split="validation")
 test_dataset = mlqa_dataset.map(
-	instruction, fn_kwargs={"all_answers": True}
+	get_single_turn_prompt_and_response, fn_kwargs={"all_answers": True}
 	)
+print(test_dataset[0])
 dataset = DatasetDict({"test": test_dataset})
 dataset.save_to_disk(save_dir)
