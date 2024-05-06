@@ -1,4 +1,3 @@
-import csv
 import json
 import logging
 import os
@@ -6,6 +5,7 @@ from dataclasses import dataclass, field
 from types import MethodType
 from typing import Optional
 
+import pandas as pd
 import torch
 import torch.nn.functional as F
 import transformers
@@ -14,7 +14,7 @@ from tqdm import tqdm
 from transformers import HfArgumentParser, set_seed
 from vllm import LLM, SamplingParams
 
-from model import extract_answer, get_model_and_tokenizer
+from model import extract_answer
 
 logger = logging.getLogger()
 transformers.logging.set_verbosity_error()
@@ -33,7 +33,7 @@ class ScriptArguments:
 	dataset: Optional[str] = field(
 		default="data/squad_v2",
 		)
-	output_csv_file: Optional[str] = field(default="results/results.csv")
+	output_csv_path: Optional[str] = field(default="results")
 	debug: Optional[bool] = field(default=False)
 	shuffle: Optional[bool] = field(default=False)
 	seed: Optional[int] = field(default=42)
@@ -112,10 +112,6 @@ def get_answer(messages):
 	return extract_answer(response), response
 
 
-output_dir = os.path.dirname(script_args.output_csv_file)
-if not os.path.exists(output_dir):
-	os.makedirs(output_dir)
-
 # LANGUAGES = ["en", "zh-Hans", "fr", "es", "vi", "id", "ja"]
 LANGUAGES = ["ar", "de", "en", "es", "hi", "vi", "zh"]
 for activation_mask, mask_lang in tqdm(zip(lang_neuron_positions, LANGUAGES)):
@@ -125,25 +121,21 @@ for activation_mask, mask_lang in tqdm(zip(lang_neuron_positions, LANGUAGES)):
 				obj = model.llm_engine.driver_worker.model_runner.model.model.layers[i].mlp
 				obj.forward = MethodType(factory(layer_mask.to('cuda')), obj)
 
-with open(script_args.output_csv_file, "w") as file:
-	writer = csv.writer(file)
-	writer.writerow(
-		[
-			"Context",
-			"Question",
-			"Correct answers",
-			"Model answer",
-			"Full response",
-			"Exact match",
-			]
-		)
-
-	dataset = load_from_disk(script_args.dataset)["test"]
+for eval_lang in LANGUAGES:
+	# Load the dataset
+	ds_path = f"{script_args.dataset}/{eval_lang}/dev"
+	dataset = load_from_disk(ds_path)["test"]
 	if script_args.shuffle:
 		dataset = dataset.shuffle(seed=script_args.seed)
 	if script_args.num_samples is not None:
 		dataset = dataset.select(range(script_args.num_samples))
 
+	# Prepare an empty DataFrame to store the data
+	columns = ["Context", "Question", "Correct answers", "Model answer", "Full response", "Exact match"]
+	results_df = pd.DataFrame(columns=columns)
+	data_to_add = []
+
+	# Process each entry in the dataset
 	for messages in tqdm(dataset["messages"]):
 		answers = extract_answer(messages[-1]["content"])
 		prompt = messages[1]["content"]
@@ -157,14 +149,19 @@ with open(script_args.output_csv_file, "w") as file:
 		logger.debug("Model answer: %s", model_answer)
 		exact_match = model_answer is not None and model_answer in answers
 
-		writer.writerow(
-			[
-				context,
-				question,
-				json.dumps(answers),
-				model_answer,
-				full_response,
-				exact_match,
-				]
+		# Append the results as a dictionary to the data_to_add list
+		data_to_add.append(
+			{
+				"Context"        : context,
+				"Question"       : question,
+				"Correct answers": json.dumps(answers),
+				"Model answer"   : model_answer,
+				"Full response"  : full_response,
+				"Exact match"    : exact_match
+				}
 			)
-		file.flush()
+	# Write the results to a CSV file
+	results_df = pd.concat([results_df, pd.DataFrame(data_to_add)], ignore_index=True)
+	output_csv_file = f"{script_args.output_csv_path}/eval_on_{eval_lang}.csv"
+	os.makedirs(os.path.dirname(output_csv_file), exist_ok=True)
+	results_df.to_csv(output_csv_file, index=False)

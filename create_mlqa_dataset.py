@@ -6,7 +6,7 @@ from datasets import DatasetDict, load_dataset
 from model import DEFAULT_SYSTEM_PROMPT
 
 
-LANG = "es"
+LANG = "ar"
 save_dir = f"data/mlqa/{LANG}/dev"
 SYSTEM_PROMPT = DEFAULT_SYSTEM_PROMPT
 

@@ -1,8 +1,9 @@
 import csv
 
-LANG = "zh"
+LANG = "vi"
 MODEL_NAME = "tinyllama-1431k-3T"
-csv_file_path = f"results/mlqa/{LANG}/{MODEL_NAME}/deactivated.csv"
+csv_file_path = f"results/mlqa/{LANG}/{MODEL_NAME}/primal.csv"
+# csv_file_path = f"results/mlqa/{LANG}/{MODEL_NAME}/deactivated.csv"
 
 with open(csv_file_path, "r") as file:
 	reader = csv.DictReader(file)
